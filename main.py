@@ -19,29 +19,27 @@ import numpy as np
 #todo : if not logged, you can't use features like : export data, add devices, users or tags, 
 #todo : you only can monitor existing datas
 
-### Variables
-# devices list
-devices_list = ["Dell 14", "Macbook Pro", "Potato", "Hp g7"]
-
 # tests variables to simule datas
-users = ["Carlos", "Ryan", "Theo", "Jimmy"]
-
+users = database.get_username()
+all_devices_name = database.all_devices_name()
+unique_devices_name = list(set(all_devices_name))
 #todo: export button ton csv with tags to for filtering, settings menu for default tags
 
 ####################################
 ############## Header ##############
 ####################################
-
-with st.container(border=True, horizontal=True, horizontal_alignment="center", vertical_alignment="bottom"):
-    title = st.markdown("""
-        <div style="text-align:left;">
-            <div style="font-size:28px; font-weight:700;">Serial Guard</div>
-            <div style="font-size:14px; margin-top:4px; margin-bottom:10px">Monitor warranties and serial numbers</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    if st.button(f"Scan Device", icon="📷", type="primary"):
-        ocr.ocr()
+with st.container(border=True, horizontal=True, vertical_alignment="bottom"):
+    header_left, header_right = st.columns([7.3,2], vertical_alignment="center")
+    with header_left:
+        title = st.markdown("""
+            <div style="text-align:left;">
+                <div style="font-size:28px; font-weight:700;">Serial Guard</div>
+                <div style="font-size:14px; margin-top:4px; margin-bottom:10px">Monitor warranties and serial numbers</div>
+            </div>
+        """, unsafe_allow_html=True)
+    with header_right:
+        if st.button(f"Scan Device", icon="📷", type="primary"):
+            ocr.ocr()
 
 ####################################
 ############## Status ##############
@@ -52,15 +50,15 @@ card_left, card_middle, card_right = st.columns(3, border=False)
 
 with card_left:
     if st.button("(4) Active Warranties ✅", use_container_width=True):
-        st.session_state.filter_status = "active"
+        pass
 
 with card_middle:
     if st.button("(4) Expiring soon ⏰", use_container_width=True):
-        st.session_state.filter_status = "expiring"
+        pass
 
 with card_right:
     if st.button("(4) Expired ❌", use_container_width=True):
-        st.session_state.filter_status = "expired"
+        pass
         
 ####################################
 ############## Search ##############
@@ -68,7 +66,7 @@ with card_right:
 
 with st.container(border=True, vertical_alignment="center"):
 # Create a search column with border
-    search_column, download_button = st.columns([6.65,1], vertical_alignment="bottom")
+    search_column, download_button = st.columns([6.65,1.01], vertical_alignment="bottom")
 
     # Display the input bar in the "search_column"
     with search_column:
@@ -76,9 +74,7 @@ with st.container(border=True, vertical_alignment="center"):
         search_options = st.multiselect(
             # Texte
             "Search by name, serial number, user, etc...",
-
-            # predefined options
-            devices_list,
+            unique_devices_name,
             accept_new_options=True,
         )
 
@@ -163,7 +159,7 @@ def add_manually_device_dialog():
 
             else:
                 st.success("Appareil ajouté.")
-                st.rerun()  # close the dialog to force the rerun
+
             
             # add user in the db
             database.add_user(assigned_user_str)
@@ -178,14 +174,13 @@ def add_manually_device_dialog():
             purchase_date,
             warranty_period_val
             )
-            st.rerun()
 
 
 # column without border
 with st.container(horizontal=True, horizontal_alignment="center", vertical_alignment="bottom"):
 
     # Display the number of all devices
-    all_device = st.subheader(f"All devices ({len(devices_list)})")
+    all_device = st.subheader(f"All devices ({database.total_devices()})")
 
     # Button to call the function 
     if st.button("➕ Add Manually"):
@@ -194,10 +189,7 @@ with st.container(horizontal=True, horizontal_alignment="center", vertical_align
 #############################################
 ############## Display devices ##############
 #############################################
-
-# "items" will chose one of these list if not empty
-# so by default, all devices will be displayed, then when we will choose a tag
-items = search_options or devices_list
+items = database.search_devices(search_options)
 
 # modify function
 # dialog's function (remplace st.popover + st.form)
@@ -255,14 +247,14 @@ with st.container(border=False, height=600):
 
             with left:
                 with st.container(horizontal=True, border=False): # device name container
-                    st.badge("1234", color="violet")
-                    st.write(item)
+                    st.badge(item["serial_number"], color="violet")
+                    st.write(item["device_name"])
                     
                 with st.container(horizontal=True): # tags container
-                    st.badge("Carlos", color="blue")
+                    st.badge(item["assigned_user"] or "Unassigned", color="blue")
                     st.badge("Expiring soon", icon="🕑", color="red")
                     st.badge("12 days left", color="gray")
-                    st.badge("14/04/2022 - 14/04/2026", color="grey")    
+                    st.badge(item["purchase_date"] or "None", color="grey")    
 
             with right:
                 with st.container(horizontal=True, border=False):
