@@ -13,6 +13,7 @@ import database, ocr
 import streamlit as st
 import pandas as pd
 import numpy as np
+from datetime import date, datetime, timedelta
 
 ############## TODO ##############
 #todo : login page
@@ -235,6 +236,20 @@ def modify_device_dialog():
                 st.success("Appareil ajouté.")
                 st.rerun()  # close the dialog to force the rerun
 
+def days_left(purchase_date, warranty_months):
+    if not purchase_date:
+        return 0
+
+    d = datetime.strptime(purchase_date, "%Y-%m-%d").date()
+
+    # ajouter les mois
+    y = d.year + (d.month - 1 + warranty_months) // 12
+    m = (d.month - 1 + warranty_months) % 12 + 1
+
+    end_date = date(y, m, d.day)
+
+    return max(0, (end_date - date.today()).days)
+
 # devices cards (where informations like device name, serial number are shown)
 with st.container(border=False, height=600):
     for item in items:
@@ -253,8 +268,8 @@ with st.container(border=False, height=600):
                 with st.container(horizontal=True): # tags container
                     st.badge(item["assigned_user"] or "Unassigned", color="blue")
                     st.badge("Expiring soon", icon="🕑", color="red")
-                    st.badge("12 days left", color="gray")
-                    st.badge(item["purchase_date"] or "None", color="grey")    
+                    st.badge(f"{days_left(item["purchase_date"], item["warranty_period"])} days left", color="gray")
+                    st.badge(datetime.strptime(item["purchase_date"], "%Y-%m-%d").strftime("%d-%m-%Y") if item["purchase_date"] else "None", color="grey")    
 
             with right:
                 with st.container(horizontal=True, border=False):
