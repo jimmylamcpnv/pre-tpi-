@@ -13,7 +13,6 @@ import database
 import ocr
 import streamlit as st
 import pandas as pd
-import numpy as np
 from datetime import date, datetime
 
 # tests variables to simule datas
@@ -84,6 +83,50 @@ def get_warranty_option(months):
     options = ["6 months", "12 months", "24 months", "36 months", "48 months"]
     target = f"{months} months"
     return target if target in options else "48 months"
+
+
+def build_export_frame(devices):
+    export_rows = []
+
+    for item in devices:
+        device_tags = item.get("tags") or []
+
+        if not isinstance(device_tags, list):
+            device_tags = [device_tags]
+
+        device_tags = [str(tag).strip() for tag in device_tags if tag and str(tag).strip()]
+
+        export_rows.append(
+            {
+                "device_name": item.get("device_name") or "",
+                "serial_number": item.get("serial_number") or "",
+                "manufacturer": item.get("manufacturer") or "",
+                "assigned_user": item.get("assigned_user") or "",
+                "tags": ", ".join(device_tags),
+                "purchase_date": item.get("purchase_date") or "",
+                "warranty_period": item.get("warranty_period") or "",
+                "status": status(item.get("purchase_date"), item.get("warranty_period", 0))["label"],
+                "days_left": days_left(item.get("purchase_date"), item.get("warranty_period", 0)),
+            }
+        )
+
+    return pd.DataFrame(
+        export_rows,
+        columns=[
+            "device_name",
+            "serial_number",
+            "manufacturer",
+            "assigned_user",
+            "tags",
+            "purchase_date",
+            "warranty_period",
+            "status",
+            "days_left",
+        ],
+    )
+
+def convert_for_download(devices):
+    return build_export_frame(devices).to_csv(index=False).encode("utf-8")
 
 
 ####################################
@@ -202,26 +245,22 @@ with st.container(border=True, vertical_alignment="center"):
             accept_new_options=True,
         )
 
+    items = database.search_devices(search_options)
+
+    if selected_status_filters:
+        items = [
+            item for item in items
+            if status(item["purchase_date"], item["warranty_period"])["key"] in selected_status_filters
+        ]
+
     # export all data with the current filter to a csv file
     with download_button:
-        @st.cache_data
-        def get_data():
-            df = pd.DataFrame(
-                np.random.randn(50, 20), columns=("col %d" % i for i in range(20))
-            )
-            return df
-
-        @st.cache_data
-        def convert_for_download(df):
-            return df.to_csv().encode("utf-8")
-
-        df = get_data()
-        csv = convert_for_download(df)
+        csv = convert_for_download(items)
 
         st.download_button(
             label="CSV",
             data=csv,
-            file_name="data.csv",
+            file_name="devices_filtered.csv",
             mime="text/csv",
             icon=":material/download:",
             disabled=not st.session_state.is_authenticated,
@@ -230,27 +269,6 @@ with st.container(border=True, vertical_alignment="center"):
 #########################################
 ############## Add devices ##############
 #########################################
-
-# open a dialog to add a device from the serial number
-# and it fills some fields automatically
-@st.dialog("Enter the serial number")
-def serial_number_auto_add(serial_number):
-    if not st.session_state.is_authenticated:
-        st.warning("Login required.")
-        return
-
-    #todo : make it possible to add a new device with only the serial number
-    #todo : and still perform the lookup via api or scraping
-    #todo : and fill the remaining fields automatically but if no data is found still allow manual entry
-
-    with st.form("test", border=False):
-        # inputs form
-        serial_number = st.text_input("Serial Number *")
-
-        with st.container(horizontal_alignment="right"):
-            st.form_submit_button()
-
-
 # open a dialog to add a device manually
 @st.dialog("Add a new device")
 def add_manually_device_dialog():
@@ -321,15 +339,6 @@ with st.container(horizontal=True, horizontal_alignment="center", vertical_align
 #############################################
 ############## Display devices ##############
 #############################################
-items = database.search_devices(search_options)
-
-if selected_status_filters:
-    items = [
-        item for item in items
-        if status(item["purchase_date"], item["warranty_period"])["key"] in selected_status_filters
-    ]
-
-
 # open a dialog to edit one device
 @st.dialog("Modify Device")
 def modify_device_dialog(item):
